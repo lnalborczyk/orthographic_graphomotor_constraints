@@ -1,0 +1,1424 @@
+---
+title: "Supplementary materials to 'Interaction between orthographic and graphomotor constraints in learning to write'"
+shorttitle: "Supplementary Materials"
+author: 
+  - name          : Jérémy Danna
+    affiliation   : 1
+    corresponding : yes # defines only one corresponding author
+    address       : Laboratoire de Neurosciences Cognitives, Pôle 3C, Case C, 3 Place Victor Hugo, 13331 Marseille Cedex 03, France 
+    email         : jeremy.danna@univ-amu.fr
+  - name          : Marieke Longcamp
+    affiliation   : 1
+  - name          : Ladislas Nalborczyk
+    affiliation   : "1, 2"
+  - name          : Jean-Luc Velay
+    affiliation   : 1
+  - name          : Claire Commengé
+    affiliation   : 2
+  - name          : Marianne Jover
+    affiliation   : 3
+affiliation:
+  - id: 1
+    institution: Aix Marseille Univ, CNRS, LNC, Marseille, France
+  - id: 2
+    institution: Aix Marseille Univ, CNRS, LPC, Marseille, France
+  - id: 3
+    institution: Aix Marseille Univ, PSYCLE, Aix-en-Provence, France
+bibliography: [bib/constraints.bib, bib/r-references.bib]
+figsintext: true
+class: doc # man, doc, jou
+link-citations: true
+fontsize: 11pt
+linestretch: 1.25
+nocite: | 
+  @R-base, @R-knitr, @R-rmarkdown, @R-tidyverse, @R-papaja
+output:
+  papaja::apa6_pdf:
+    toc: true
+    toc_depth: 3
+    highlight: "pygments" # css/github.css
+    number_sections: true
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{float}
+editor_options: 
+  chunk_output_type: console
+---
+
+\newpage
+
+```{r setup, include = FALSE}
+library(extraDistr)
+library(ggbeeswarm)
+library(tidyverse)
+library(patchwork)
+library(posterior)
+library(modelr)
+library(GGally)
+library(readxl)
+library(papaja)
+library(knitr)
+library(glue)
+library(BEST)
+library(brms)
+
+# options(kableExtra.auto_format = FALSE)
+# Sys.setenv(LANG = "en")
+
+# inline_hook <- function (x) {
+#   
+#   if (is.numeric(x) ) {
+#     
+#     # if integer, print without decimal; otherwise print two places
+#     res <- ifelse(
+#       x == round(x),
+#       sprintf("%d", x),
+#       sprintf("%.3f", x)
+#       )
+#     
+#     paste(res, collapse = ", ")
+#     
+#   }
+#   
+# }
+
+# knit_hooks$set(inline = inline_hook)
+
+knitr::opts_chunk$set(
+  eval = TRUE, echo = TRUE, cache = TRUE,
+  message = FALSE, warning = FALSE,
+  fig.align = "center", dev = "cairo_pdf",
+  out.width = "75%", fig.pos = "!htb"
+  )
+
+changeSciNot <- function(n) {
+  
+  output <- format(n, digits = 4, scientific = TRUE)
+  output <- sub("e", " x 10^", output)
+  output <- sub("\\+0?", "", output)
+  output <- sub("-0?", "-", output)
+  output
+  
+}
+```
+
+# Visual data exploration
+
+## Univariate raw data exploration
+
+```{r data, echo = FALSE, fig.width = 10, fig.height = 8, out.width = "100%", fig.cap = "Effect of grade, word frequency, and grapheme complexity on the total duration, the number of stops, the mean velocity, and the letter size. The error bars represent the 95\\% confidence intervals of the mean (assuming a Gaussian distribution)."}
+# importing the data
+df <- read_excel(
+    path = "data/RAW_DATA_FORMAT_LONG.xlsx",
+    col_names = c(
+        "child", "group", "graphomotor_difficulty", "frequency",
+        "grapheme_complexity", "trial",
+        "duration", "mean_velocity", "number_of_stops", "letter_size"
+        ),
+    col_types = c(
+        "text", "text", "text", "text", "text",
+        "numeric", "numeric", "numeric", "numeric", "numeric"
+        ),
+    # removing the first row (containing original column names)
+    skip = 1
+    ) %>%
+    # adding a column for subject
+    mutate(subject = rep_len(x = 1:16, length.out = nrow(.) ) ) %>%
+    # moving this column to the first position
+    relocate(subject) %>%
+    # removing NAs
+    na.omit
+
+# centering and reordering predictors
+df2 <- df %>%
+    mutate(
+        group = factor(
+            x = group,
+            levels = c("CP", "CE", "CM"),
+            labels = c("Grade1", "Grade3", "Grade5")
+            ),
+        frequency = factor(
+            x = frequency,
+            levels = c("LF", "HF"),
+            labels = c("LF", "HF")
+            ),
+        grapheme_complexity = factor(
+            x = grapheme_complexity,
+            levels = c("Simple", "Complex"),
+            labels = c("Simple", "Complex")
+            ),
+        graphomotor_difficulty = factor(
+            x = graphomotor_difficulty,
+            levels = c("EL", "HL"),
+            labels = c("t", "f")
+            )
+        ) %>%
+    # removes rows where duration is equal to 0
+    filter(duration != 0)
+
+# defining contrasts
+contrasts(df2$frequency) <- c(-0.5, +0.5)
+contrasts(df2$grapheme_complexity) <- c(-0.5, +0.5)
+contrasts(df2$graphomotor_difficulty) <- c(-0.5, +0.5)
+
+# visual exploration of the data
+df2 %>%
+    pivot_longer(cols = duration:letter_size) %>%
+    mutate(
+        name = factor(
+            x = name,
+            levels = c("duration", "number_of_stops", "mean_velocity", "letter_size"),
+            labels = c(
+                "Duration (in seconds)", "Number of stops",
+                "Mean velocity (in mm per second)", "Letter size (in mm)"
+                )
+            )
+        ) %>%
+    ggplot(
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = value,
+            colour = grapheme_complexity,
+            fill = grapheme_complexity,
+            group = interaction(grapheme_complexity, group)
+            )
+        ) +
+    # plotting the raw data
+    geom_quasirandom(
+        dodge.width = 0.75,
+        width = 0.2, size = 1.5,
+        alpha = 0.15, show.legend = FALSE
+        ) +
+    stat_summary(
+        fun.data = function(x){mean_cl_normal(x, conf.int = 0.95)},
+        geom = "errorbar", size = 0.75, width = 0, show.legend = FALSE,
+        position = position_dodge(width = 0.75)
+        ) +
+    stat_summary(
+        fun = mean, geom = "point", size = 1.5,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    stat_summary(
+        fun = mean, geom = "line", size = 0.75,
+        position = position_dodge(width = 0.75),
+        show.legend = FALSE
+        ) +
+    labs(
+        x = "",
+        y = "",
+        colour = "Grapheme complexity",
+        fill = "Grapheme complexity"
+        ) +
+    facet_wrap(facets = ~name, ncol = 2, scales = "free", shrink = TRUE) +
+    theme_bw(base_size = 12, base_family = "Open Sans") +
+    scale_colour_brewer(palette = "Dark2") +
+    ylim(0, NA) +
+    theme(legend.position = "top")
+```
+
+Figure \ref{fig:data} shows the effect of grade, word frequency, and grapheme complexity on the letter duration, the number of stops, the mean velocity, and the letter size. This figure suggests that the average duration (in seconds) seems to decrease monotonically with grade. The number of stops also seems to decrease with grade, with most trials for children from grade 2 being associated with no stop.
+
+## Bivariate correlations by grade
+
+Figure \ref{fig:correlation} shows the overall and by-grade Spearman correlation between each pair of variables. This figure reveals medium to strong positive and negative correlations between each pair of variable. These relations are sometimes non-linear (e.g., between duration and mean velocity), hence the use of Spearman (rather than Pearson) correlation coefficients.
+
+```{r correlation, echo = FALSE, out.width = "100%", fig.width = 10, fig.height = 10, fig.cap = "Overall and by-grade Spearman correlation between each pair of measured variables."}
+# plotting a correlation matrix
+# https://www.r-graph-gallery.com/199-correlation-matrix-with-ggally.html
+ggpairs(
+    data = df2,
+    mapping = ggplot2::aes(colour = group),
+    columns = 8:11,
+    upper = list(continuous = wrap("cor", method = "spearman") )
+    ) +
+    theme_bw(base_size = 12, base_family = "Open Sans")
+```
+
+\newpage
+
+# Bayesian multilevel modelling
+
+## Modelling positive-only values
+
+A dominant feature of durations or response times (RTs) is that their distribution is generally positively skewed, with the spread and/or the skewness increasing with task difficulty [for review, see for instance @forstmann_sequential_2016]. Therefore, several models have been proposed to account for the peculiarities of the data coming from such tasks as well as to relate it to the underlying cognitive processes. We discuss below why using Gaussian models for this kind of data is generally not a sensible idea and describe our approach in more details. We follow a general "Bayesian workflow" by building our model in an iterative manner and by motivating and validating each modelling choice [for more details, see for instance @gelman_bayesian_2020].
+
+We first fitted a Bayesian multilevel (also known as "mixed-effects") Gaussian multivariate (i.e., with multiple outcomes) model. One way of evaluating this model is to evaluate its predictions. If this model is a good description of the process that generated the observed data, then it should be able to generate data that looks like the observed data. The process of generating data from the estimated posterior distribution is called *posterior predictive checking* and can be used in many different ways using the `pp_check()` method [@gabry_visualization_2019]. In Figure \ref{fig:positive}, we depict the  distribution of the raw data along with the distribution of 100 simulated datasets.
+
+```{r positive, echo = FALSE, out.width = "100%", fig.width = 12, fig.height = 8, fig.cap = "Posterior predictive checks for the multilevel Gaussian model. The dark blue density depicts the raw data whereas light blue densities represent data simulated from the posterior predictive distribution."}
+# importing the model
+mod1 <- readRDS("models/multilevel_gaussian_model.rds")
+
+# posterior predictive checks
+ppc_duration <-
+    pp_check(mod1, resp = "duration", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Duration (in seconds)", y = "Probability density")
+
+ppc_stops <-
+    pp_check(mod1, resp = "numberofstops", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Number of stops", y = "Probability density")
+
+ppc_velocity <-
+    pp_check(mod1, resp = "meanvelocity", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Mean velocity (in mm per second)", y = "Probability density")
+
+ppc_letter <-
+    pp_check(mod1, resp = "lettersize", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Letter size (in mm)", y = "Probability density")
+
+# displaying the PPCs
+ppc_gaussian <- (ppc_duration + ppc_stops) / (ppc_velocity + ppc_letter)
+ppc_gaussian + plot_annotation(
+    title = "Posterior predictive checks for the multilevel Gaussian model",
+    subtitle = "The dark blue density depicts the raw data whereas light blue densities represent data simulated from the posterior predictive distribution"
+    )
+```
+
+This figure reveals that the Gaussian model fails to account for the peculiarities of the data at hand. For instance, it systematically fails to predict the right-skew of all four variables, and more dramatically, sometimes predicts negatives values for these variables, although they are strictly positive. Moreover, using a Gaussian distribution to model the number of stops also leads to nonsensical predictions as the number of stops is necessarily a positive integer (whereas the Gaussian distribution can produce any real number), as illustrated in the upper right panel of Figure \ref{fig:positive}.
+
+## Shifted-lognormal regression model
+
+A useful description of RTs or durations should be able to account for the effects of the difficulty of the task, as well as changes in shift and spread of the distribution. The Log-normal, Ex-Gaussian, or Weibull distributions often provide a good fit to these data, but their parameters are difficult to interpret in terms of difficulty, shift, or spread (i.e., these distributions do not have straightforward interpretable parameters). In contrast, the shifted log-normal distribution has parameters that can easily be interpreted in terms of difficulty, shift, and spread.
+
+The log-normal distribution is called "log-normal" because the parameters are the mean and standard deviation of the log-transformed response times, which is assumed to be a normal (Gaussian) distribution. The shifted log-normal distribution is then described by three parameters:
+
+- $\mu$ (mu, difficulty): the mean of the log-normal distribution. The mean of $\mu$
+ represents the median response time. The median response time is given by $\text{shift} + \exp (\mu)$. 
+
+- $\sigma$ (sigma, scale): the standard deviation of the log-normal distribution. Increases the mean but not the median of $\mu$.
+
+- $\text{shift}$ (ndt) indicates the time of the earliest possible response. When $\text{shift} = 0$, the shifted log-normal distribution correspond to the conventional log-normal distribution with two parameters.
+
+Regression models using this family usually aim to predict $\mu$, the mean of the log-normal distribution. We employ this strategy as well, while noticing that both $\sigma$ and $\text{shift}$ could be allowed to vary across conditions as well.
+
+## Poisson regression model
+
+Whereas the previous models are able to take into account the right-skew of the four variables we are interested in, they are still not able to make proper predictions with regards to the number of stops (because the log-normal distribution is continuous). Yet a better model could be fitted by picking up a discrete probability distribution defined on the positive integer real. The Poisson regression model is appropriate for modelling discrete counts of events (e.g., the number of stops) that happen in a fixed interval of space or time with no upper bound. The Poisson model is simpler than the Gaussian or the lognormal one because it has only one parameter $\lambda$ that describes its shape. The parameter $\lambda$ is the expected value of the outcome $y$ (and also its expected variance). However, we need a link function to relate the predictors with the parameter $\lambda$ and to ensure that $\lambda$ is always positive. We use the conventional logarithmic link function, resulting in the following linear model:
+
+$$
+\begin{aligned}
+y_{i} &\sim \mathrm{Poisson}(\lambda_{i})\\
+\log(\lambda_{i}) &= \alpha + \beta_{g} \cdot \text{grade}_{i} + \beta_{f} \cdot \text{frequency}_{i} +\\ &\quad  \beta_{graphe} \cdot \text{grapheme}_{i} + \beta_{grapho} \cdot \text{graphomotor}_{i}\\
+\end{aligned}
+$$
+
+This kind of model is now able to predict valid number of stops (i.e., positive integers). Note that for simplicity, we omit the varying effects and the priors from the above model [for more details on Poisson regression, see @winter_poisson_2021].
+
+<!--
+
+But it still can not account for sur-represented zero values in some groups (e.g., in the number of stops in Grade-2 and Grade-3 children, cf. Figure \ref{fig:data}). To fix this issue, we describe below a zero-inflated poisson regression model, where the number of stops can arise as the result of two distinct processes (i.e., a kind of mixture model). In our case, we consider that the number of stops may depend on writing expertise (for which grade is considered to be a proxy). Once writing is automatised, we do not expect stops. The probability of taping into this "zero-stop" process is given by the mixture probability $p_{i}$. This results in the following model:
+
+$$
+\begin{aligned}
+y &\sim \mathrm{ZIPoisson}(p_{i}, \lambda_{i})\\
+\text{logit}(p_{i}) &= \alpha_{p}\\
+\log(\lambda_{i}) &= \alpha_{\lambda} + \beta_{\lambda g} \cdot \text{grade}_{i} + \beta_{f} \cdot \text{freq}_{i} +\\ &\quad  \beta_{graphe} \cdot \text{grapheme}_{i} + \beta_{grapho} \cdot \text{graphomotor}_{i}\\
+\end{aligned}
+$$
+
+where the mixture probability $p_{i}$ is assigned its own intercept $\alpha_{p}$ (estimating the average probability of zero error).
+
+-->
+
+## Fitting the final model
+
+To set up the model, we need to invoke the `brms::brmsformula()` function and construct one formula for each of the four dependant variables. We fitted all models using the `brms` package [@R-brms_a] [for an introduction to Bayesian multilevel modelling in brms, see @nalborczyk_introduction_2019]. We used sum contrasts (i.e., recoding conditions as -0.5 vs. 0.5) for binary predictors (i.e., frequency, grapheme complexity, and graphomotor difficulty) and used the default factor coding scheme (i.e., dummy coding) for grade.
+
+```{r model1-formula, results = "hide"}
+# defining the model formula for the generalised multilevel model
+formula_generalised <-
+    bf(
+        duration ~ 1 + group * frequency * grapheme_complexity *
+            graphomotor_difficulty + (1 | subject),
+        family = shifted_lognormal()
+        ) +
+    bf(
+        mean_velocity ~ 1 + group * frequency * grapheme_complexity *
+            graphomotor_difficulty + (1 | subject),
+        family = shifted_lognormal()
+        ) +
+    bf(
+        number_of_stops ~ 1 + group * frequency * grapheme_complexity *
+            graphomotor_difficulty + (1 | subject),
+        family = poisson()
+        ) +
+    bf(
+        letter_size ~ 1 + group * frequency * grapheme_complexity *
+            graphomotor_difficulty + (1 | subject),
+        family = shifted_lognormal()
+        )
+
+# defining the priors for the multilevel generalised model
+priors_generalised <- c(
+    prior(normal(1, 0.5), class = Intercept, resp = "duration"),
+    prior(normal(0, 0.5), class = b, resp = "duration"),
+    prior(exponential(0.1), class = sd, resp = "duration"),
+    prior(exponential(0.1), class = sigma, resp = "duration"),
+    prior(normal(2, 0.5), class = Intercept, resp = "meanvelocity"),
+    prior(normal(0, 0.5), class = b, resp = "meanvelocity"),
+    prior(exponential(0.1), class = sd, resp = "meanvelocity"),
+    prior(exponential(0.1), class = sigma, resp = "meanvelocity"),
+    prior(normal(1, 0.5), class = Intercept, resp = "numberofstops"),
+    prior(normal(0, 0.5), class = b, resp = "numberofstops"),
+    prior(exponential(0.1), class = sd, resp = "numberofstops"),
+    prior(normal(2, 0.5), class = Intercept, resp = "lettersize"),
+    prior(normal(0, 0.5), class = b, resp = "lettersize"),
+    prior(exponential(0.1), class = sd, resp = "lettersize"),
+    prior(exponential(0.1), class = sigma, resp = "lettersize")
+    )
+```
+
+```{r model1, echo = TRUE, eval = TRUE, results = "hide"}
+# centering and reordering predictors
+df2 <- df %>%
+    mutate(
+        group = factor(
+            x = group,
+            levels = c("CP", "CE", "CM"),
+            labels = c("Grade1", "Grade3", "Grade5")
+            ),
+        frequency = factor(
+            x = frequency,
+            levels = c("LF", "HF"),
+            labels = c("LF", "HF")
+            ),
+        grapheme_complexity = factor(
+            x = grapheme_complexity,
+            levels = c("Simple", "Complex"),
+            labels = c("Simple", "Complex")
+            ),
+        graphomotor_difficulty = factor(
+            x = graphomotor_difficulty,
+            levels = c("EL", "HL"),
+            labels = c("t", "f")
+            )
+        ) %>%
+    # removes rows where duration is equal to 0
+    filter(duration != 0)
+
+# defining contrasts
+contrasts(df2$frequency) <- c(-0.5, +0.5)
+contrasts(df2$grapheme_complexity) <- c(-0.5, +0.5)
+contrasts(df2$graphomotor_difficulty) <- c(-0.5, +0.5)
+
+# fitting the model
+mod2 <- brm(
+    formula = formula_generalised + set_rescor(rescor = FALSE),
+    prior = priors_generalised,
+    chains = 4, cores = 4,
+    warmup = 2000, iter = 1e4,
+    control = list(adapt_delta = 0.95),
+    data = df2,
+    sample_prior = TRUE,
+    file = "models/multilevel_generalised_model"
+    )
+```
+
+We then fit this model below using the `brms::brm()` function. We run four chains, each for 10000 iterations and using the first 2000 iterations used as warmup (i.e., the first 2000 samples of each chain are discarded from the final analysis). This results in a total of $4 \times (10000 - 2000) = 32000$ samples from the (joint) posterior distribution that will be used for inference.
+
+## Evaluating the model
+
+One way of evaluating the model is to evaluate its predictions. In Figure \ref{fig:ppc}, we depict the distribution of the raw data along with the distribution of 100 simulated datasets (a posterior predictive check, as introduced previously).
+
+```{r ppc, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 12, fig.height = 8, fig.cap = "Posterior predictive checking. The dark blue line represents the distribution of raw data whereas light blue lines represent data simulated from the posterior distribution."}
+# posterior predictive checks
+ppc_duration <-
+    pp_check(mod2, resp = "duration", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Duration (in seconds)", y = "Probability density")
+
+ppc_stops <-
+    pp_check(mod2, resp = "numberofstops", ndraws = 1e2, type = "bars") +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Number of stops", y = "Observed vs. predicted count")
+
+ppc_velocity <-
+    pp_check(mod2, resp = "meanvelocity", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Mean velocity (in mm per second)", y = "Probability density")
+
+ppc_letter <-
+    pp_check(mod2, resp = "lettersize", ndraws = 1e2) +
+    theme_minimal(base_size = 12, base_family = "Open Sans") +
+    theme(legend.position = "none") +
+    labs(x = "Letter size (in mm)", y = "Probability density")
+
+# displaying the PPCs
+ppc_generalised <- (ppc_duration + ppc_stops) / (ppc_velocity + ppc_letter)
+ppc_generalised + plot_annotation(
+    title = "Posterior predictive checks for the multilevel generalised model",
+    subtitle = "The dark blue density depicts the raw data whereas light blue densities represent data simulated from the posterior predictive distribution"
+    )
+```
+
+As can be seen from Figure \ref{fig:ppc}, the model seems pretty good at simulating data that looks like the observed data. From this predictive/sampling distribution (i.e., the distribution of simulated data sets), so-called "Bayesian *p*-values" can be computed to quantify the compatibility between the observed data and the proposed model.
+
+\newpage
+
+## Hypothesis testing
+
+We can test any arbitrary hypothesis using the `brms::hypothesis()` method, which is computing a Bayes factor via the Savage-Dickey method [@wagenmakers_bayesian_2010]. This method consists in comparing the posterior probability density to the prior probability density for some hypothesised value for the parameter of interest (e.g., $\theta = 0$). For instance, we test below the hypothesis according to which the effect of graphemic complexity in Grade 1 would be null.
+
+```{r hypothesis1, echo = TRUE, eval = TRUE, fig.cap = "Hypothesis testing via the Savage-Dickey method. The resulting Bayes factor (BF) is the ratio of the height (i.e., the density probability) of the posterior versus prior distribution at some value of interest for the parameter (here it is 0)."}
+# testing whether the effect of grapheme complexity on duration equal to 0
+hyp <- hypothesis(x = mod2, hypothesis = "duration_grapheme_complexity1 = 0")
+
+# prints the output
+print(hyp)
+
+# plotting it
+data.frame(posterior = hyp$samples$H1, prior = hyp$prior_samples$H1) %>%
+  gather(type, value) %>%
+  ggplot(aes(x = value, fill = type) ) +
+  geom_vline(xintercept = 0, linetype = 2, alpha = 1) +
+  geom_area(stat = "density", alpha = 0.8, position = "identity") +
+  theme_bw(base_size = 12, base_family = "Open Sans") +
+  labs(x = expression(beta[grapheme_complexity]), y = "Probability density") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(legend.title = element_blank() ) +
+  coord_cartesian(xlim = c(-2, 2) )
+```
+
+The resulting Bayes factor (called "Evid. Ratio" in the output) may be interpreted as follows: the observed data are `r round(hyp$hypothesis$Evid.Ratio, 2)` more likely under the hypothesis of null effect than under the hypothesis of a non-null effect. From the BF in favour of the null hypothesis (relative to the alternative hypothesis), we can compute the BF in favour of the alternative hypothesis (relative to the null hypothesis), using $\text{BF}_{10} = 1 / \text{BF}_{01}$ (we report the $\text{BF}_{10}$ in the following). Alternatively, the BF can be interpreted as an *updating factor*, indicating by "how much" we should update our *prior odds* (the ratio of the a priori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$) to convert them into *posterior odds* (the ratio of the a posteriori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$).
+
+\newpage
+
+# Interpretation of the results for each variable
+
+Now that we have fitted the model, we are left with the task of interpreting the output from the model. The output of the model is a (joint) posterior distribution over all parameters of the model. We can marginalise this joint distribution to obtain the (marginal) posterior distribution on each parameter. To summarise this distribution, we can retrieve samples from the joint posterior distribution.
+
+```{r posterior, echo = TRUE, eval = TRUE}
+# retrieves posterior samples (for all parameters)
+posterior_samples <- as_draws_df(mod2)
+
+# displays a summary
+posterior_summary <- summarise_draws(posterior_samples)
+
+# displays the first six rows
+head(posterior_summary)
+```
+
+The above command outputs a matrix with parameters of the model in columns and posterior samples in rows. Let's examine these results for each parameter in more details. For instance, Figure \ref{fig:posterior-intercept-drift} represents the posterior distribution of the average letter duration in Grade-1 children.
+
+```{r posterior-intercept-drift, echo = TRUE, eval = TRUE, fig.cap = "Posterior distribution of the intercept (i.e., the average letter duration in Grade 1). The mode (i.e., the most probable value) and the 95\\% credible (highest density) interval are also displayed."}
+# retrieves the posterior samples for the average letter duration in Grade 1
+average_duration_grade1 <- posterior_samples$b_duration_Intercept +
+    posterior_samples$ndt_duration
+
+# plotting it
+plotPost(
+  paramSampleVec = exp(average_duration_grade1), showMode = TRUE,
+  xlab = expression(paste(alpha[duration][paste("[", Grade1, "]")] ) )
+  )
+```
+
+Recall that we used a logarithmic link function, therefore the median letter duration is given by $\exp(\alpha + \text{shift})$.
+
+## Letter duration
+
+Table \ref{tab:duration-summary} reports the estimates (median of the posterior distribution) and associated 95% credible intervals and $\text{BF}$s for all parameters regarding the letter duration variable.
+
+```{r duration-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# formatting BFs in table
+# changeSciNot <- function(n) {
+#   
+#   n <- ifelse(n < 0, abs(n), n)
+#   output <- format(n, digits = 4, scientific = TRUE)
+#   output <- sub("e", "x10^", output)
+#   output <- sub("\\+0?", "", output)
+#   output <- sub("-0?", "-", output)
+#   output
+#   
+# }
+
+# prints a summary of the model
+model_summary_duration <-
+  summary(object = mod2, prob = 0.95, robust = TRUE)$fixed %>%
+  data.frame %>%
+  rownames_to_column(var = "Parameter") %>%
+  filter(str_detect(Parameter, "duration") ) %>%
+  dplyr::select(-Bulk_ESS, -Tail_ESS) %>%
+  magrittr::set_colnames(c("Term", "Estimate", "MAD", "Lower", "Upper", "Rhat") ) %>%
+  # computes the BF for each effect
+  mutate(BF10 = 1 / hypothesis(mod2, glue("{Term} = 0") )$hypothesis$Evid.Ratio) %>%
+  # rounds BFs
+  mutate(BF10 = ifelse(BF10 > 1000, changeSciNot(BF10), round(BF10, 3) ) ) %>%
+  # if numeric, rounds to 3 decimals
+  mutate_if(is.numeric, round, 3) %>%
+  # removes the extra "duration_"
+  mutate(Term = gsub(pattern = "duration_", replacement = "", x = Term) ) %>%
+  # and the 1s
+  mutate(Term = gsub(pattern = "1", replacement = "", x = Term) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = model_summary_duration,
+    placement = "htb",
+    align = rep("c", 7),
+    digits = c(0, 3, 3, 3, 3, 3, 3),
+    caption = "Estimates and BFs for the slopes for letter duration.",
+    note = "For each slope (for each line), the first two columns represent the
+    estimated most probable value and its standard error (SE). The 'Lower' and
+    'Upper' columns contain the lower and upper bounds of the 95% CrI, whereas
+    the 'Rhat' column reports the Gelman-Rubin statistic. The last column reports
+    the Bayes factor in favour of the alternative hypothesis, relative to the
+    null hypothesis (BF10).",
+    escape = TRUE,
+    landscape = TRUE,
+    font_size = "scriptsize"
+    )
+```
+
+These estimations are better understood visually. Thus, we plot the predictions of this model against raw data in Figure \ref{fig:duration-predictions-plot}.
+
+```{r duration-predictions, echo = TRUE, eval = TRUE}
+# retrieving the model's predictions
+duration_predictions <- df2 %>%
+    data_grid(graphomotor_difficulty, grapheme_complexity, frequency, group) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "duration",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    dplyr::rename(estimate = Estimate, mad = Est.Error, lower = Q2.5, upper = Q97.5)
+```
+
+```{r duration-predictions-plot, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Letter duration by grade and word frequency (x-axis), grapheme complexity (in colour), and graphomotor difficulty (in panels). Transparent points represent individual data per participant. The surimposed dots and intervals represent the model's predictions (median and 95\\% credible interval of the posterior distribution)."}
+# plotting raw data along with the model's predictions
+df2 %>%
+    ggplot(
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = duration,
+            colour = grapheme_complexity,
+            fill = grapheme_complexity,
+            group = grapheme_complexity
+            )
+        ) +
+    # plotting the raw data
+    geom_quasirandom(
+        dodge.width = 0.75,
+        width = 0.2, size = 1.5,
+        alpha = 0.2, show.legend = FALSE
+        ) +
+    # plotting the model's predictions
+    geom_line(
+        data = duration_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate,
+            group = interaction(group, grapheme_complexity),
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    geom_pointrange(
+        data = duration_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate, ymin = lower, ymax = upper,
+            group = grapheme_complexity,
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1, fatten = 2,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    labs(
+        x = "",
+        y = "Letter duration (in seconds)",
+        colour = "Grapheme complexity",
+        fill = "Grapheme complexity"
+        ) +
+    facet_wrap(~graphomotor_difficulty) +
+    theme_bw(base_size = 12, base_family = "Open Sans") +
+    scale_colour_brewer(palette = "Dark2") +
+    scale_fill_brewer(palette = "Dark2") +
+    ylim(0, NA) +
+    theme(legend.position = "top") +
+    coord_cartesian(ylim = c(0, 8) )
+```
+
+As can be seen in Figure \ref{fig:duration-predictions-plot}, the model predicts larger letter duration for hard letters as compared to easy letters for each grade. As can be seen from Table \ref{tab:duration-summary}, the only BFs favouring the alternative hypothesis (relative to the null hypothesis) are the BFs for the difference between Grade 1 and Grade 3 in average letter duration (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as the difference between Grade 1 and Grade 5 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:duration-predictions-summary}.
+
+```{r duration-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# retrieving the model's predictions
+duration_predictions <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "duration",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    magrittr::set_colnames(c(
+        "Group", "Frequency", "Grapheme complexity", "Graphomotor difficulty",
+        "Estimate", "MAD", "Lower", "Upper"
+        ) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = duration_predictions,
+    placement = "htb",
+    align = rep("c", 8),
+    digits = c(0, 0, 0, 0, 3, 3, 3, 3),
+    caption = "Estimated letter duration in each condition.",
+    note = "For each condition, the 'Estimate' and 'MAD' columns contain the
+    median and the median absolute deviation (MAD) of the posterior distribution,
+    respectively. The 'Lower' and 'Upper' columns contain the lower and upper
+    bounds of the 95% credible interval.",
+    escape = TRUE,
+    landscape = FALSE,
+    font_size = "scriptsize"
+    )
+```
+
+## Number of stops
+
+Table \ref{tab:stops-summary} reports the estimates (median of the posterior distribution) and associated 95% credible intervals and $\text{BF}$s for all parameters regarding the number of stops.
+
+```{r stops-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# prints a summary of the model
+model_summary_stops <-
+  summary(object = mod2, prob = 0.95, robust = TRUE)$fixed %>%
+  data.frame %>%
+  rownames_to_column(var = "Parameter") %>%
+  filter(str_detect(Parameter, "numberofstops") ) %>%
+  dplyr::select(-Bulk_ESS, -Tail_ESS) %>%
+  magrittr::set_colnames(c("Term", "Estimate", "MAD", "Lower", "Upper", "Rhat") ) %>%
+  # compute BF for each effect
+  mutate(BF10 = 1 / hypothesis(mod2, glue("{Term} = 0") )$hypothesis$Evid.Ratio) %>%
+  # round BFs
+  mutate(BF10 = ifelse(BF10 > 1000, changeSciNot(BF10), round(BF10, 3) ) ) %>%
+  # if numeric, round to 3 decimals
+  mutate_if(is.numeric, round, 3) %>%
+  # removes the extra variable name
+  mutate(Term = gsub(pattern = "numberofstops_", replacement = "", x = Term) ) %>%
+  # and the 1s
+  mutate(Term = gsub(pattern = "1", replacement = "", x = Term) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = model_summary_stops,
+    placement = "htb",
+    align = rep("c", 7),
+    digits = c(0, 3, 3, 3, 3, 3, 3),
+    caption = "Estimates and BFs for the slopes for the number of stops.",
+    note = "For each slope (for each line), the first two columns represent the
+    estimated most probable value and its standard error (SE). The 'Lower' and
+    'Upper' columns contain the lower and upper bounds of the 95% CrI, whereas
+    the 'Rhat' column reports the Gelman-Rubin statistic. The last column reports
+    the Bayes factor in favour of the alternative hypothesis, relative to the
+    null hypothesis (BF10).",
+    escape = TRUE,
+    landscape = TRUE,
+    font_size = "scriptsize"
+    )
+```
+
+These estimations are better understood visually. Thus, we plot the predictions of this model against raw data in Figure \ref{fig:stops-predictions-plot}.
+
+```{r stops-predictions, echo = TRUE, eval = TRUE}
+# retrieving the model's predictions
+stops_predictions <- df2 %>%
+    data_grid(graphomotor_difficulty, grapheme_complexity, frequency, group) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "numberofstops",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    dplyr::rename(estimate = Estimate, mad = Est.Error, lower = Q2.5, upper = Q97.5)
+```
+
+```{r stops-predictions-plot, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Number of stops by grade and word frequency (x-axis), grapheme complexity (in colour), and graphomotor difficulty (in panels). Transparent points represent individual data per participant. The surimposed dots and intervals represent the model's predictions (median and 95\\% credible interval of the posterior distribution)."}
+# plotting raw data along with the model's predictions
+df2 %>%
+    ggplot(
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = number_of_stops,
+            colour = grapheme_complexity,
+            fill = grapheme_complexity,
+            group = grapheme_complexity
+            )
+        ) +
+    # plotting the raw data
+    geom_quasirandom(
+        dodge.width = 0.75,
+        width = 0.2, size = 1.5,
+        alpha = 0.2, show.legend = FALSE
+        ) +
+    # plotting the model's predictions
+    geom_line(
+        data = stops_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate,
+            group = interaction(group, grapheme_complexity),
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    geom_pointrange(
+        data = stops_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate, ymin = lower, ymax = upper,
+            group = grapheme_complexity,
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1, fatten = 2,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    labs(
+        x = "",
+        y = "Number of stops",
+        colour = "Grapheme complexity",
+        fill = "Grapheme complexity"
+        ) +
+    facet_wrap(~graphomotor_difficulty) +
+    theme_bw(base_size = 12, base_family = "Open Sans") +
+    scale_colour_brewer(palette = "Dark2") +
+    scale_fill_brewer(palette = "Dark2") +
+    ylim(0, NA) +
+    theme(legend.position = "top") +
+    coord_cartesian(ylim = c(0, 9) )
+```
+
+As can be seen in Figure \ref{fig:stops-predictions-plot}, the model most predicts an interaction between the effect of the word frequency and the effect of first-letter graphomotor difficulty in Grade 1, with infrequent words leading to a greater number of stops than frequent words for hard letters (HL) more than for easy letters (EL)
+(`r glue_data(model_summary_stops %>% dplyr::filter(Term == "frequency:graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). As can be seen from Table \ref{tab:stops-summary}, others BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as between Grade 1 and Grade 5 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), the effect of word frequency in Grade 1 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "frequency"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and Grade 3 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade3:frequency"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:stops-predictions-summary}.
+
+```{r stops-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# retrieving the model's predictions
+stops_predictions <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "numberofstops",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    magrittr::set_colnames(c(
+        "Group", "Frequency", "Grapheme complexity", "Graphomotor difficulty",
+        "Estimate", "MAD", "Lower", "Upper"
+        ) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = stops_predictions,
+    placement = "htb",
+    align = rep("c", 8),
+    digits = c(0, 0, 0, 0, 3, 3, 3, 3),
+    caption = "Estimated number of stops in each condition.",
+    note = "For each condition, the 'Estimate' and 'MAD' columns contain the
+    median and the median absolute deviation (MAD) of the posterior distribution,
+    respectively. The 'Lower' and 'Upper' columns contain the lower and upper
+    bounds of the 95% credible interval.",
+    escape = TRUE,
+    landscape = FALSE,
+    font_size = "scriptsize"
+    )
+```
+
+```{r posterior-duration, echo = FALSE, eval = FALSE}
+# Now that we have fitted the model, we are left with the task of interpreting the output from the model. The output of the model is a (joint) posterior distribution over all parameters of the model. We can marginalise this joint distribution to obtain the (marginal) posterior distribution on each parameter. To summarise this distribution, we can retrieve samples from the joint posterior distribution.
+
+#############################################################################
+# average predictions in the linear scale
+######################################################################
+
+duration_predictions <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "duration",
+        scale = "linear", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    group_by(group, frequency, graphomotor_difficulty) %>%
+    summarise(moy = mean(Estimate) )
+
+# retrieves posterior samples (for all parameters related to letter duration)
+posterior_samples <- posterior_samples(x = mod2, pars = regex("duration") ) %>%
+    # keeps only slopes
+    select(contains(match = "b_") )
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
+duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
+duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# computes slope for frequency for Grade 1 and easy letter (t)
+slope_t <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
+duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
+duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# computes slope for frequency for Grade 1 and hard letter (f)
+slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
+
+########################
+# for grade 3
+####################
+
+# retrieves the posterior samples for the slope for frequency in Grade 3 for the letter "t"
+duration_frequency_grade3_LF <- posterior_samples$b_duration_Intercept +
+    posterior_samples$b_duration_groupGrade3 +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1` +
+    (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1` +
+    (-0.5) * posterior_samples$`b_duration_groupGrade3:graphomotor_difficulty1` +
+    (-0.5) * (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 3 for the letter "t"
+duration_frequency_grade3_LF <- posterior_samples$b_duration_Intercept +
+    posterior_samples$b_duration_groupGrade3 +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+    0.5 * posterior_samples$`b_duration_groupGrade3:frequency1` +
+    (-0.5) * posterior_samples$`b_duration_groupGrade3:graphomotor_difficulty1` +
+    0.5 * (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1:graphomotor_difficulty1`
+
+plotPost(duration_frequency_grade3_LF)
+
+# computes slope for frequency for Grade 3 and easy letter (t)
+slope_t <- duration_frequency_grade3_HF - duration_frequency_grade3_LF
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
+duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
+duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# computes slope for frequency for Grade 1 and hard letter (f)
+slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
+
+########################
+# for grade 5
+####################
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
+duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
+duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# computes slope for frequency for Grade 1 and easy letter (t)
+slope_t <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
+duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
+    (-0.5) * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
+duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
+    0.5 * posterior_samples$b_duration_frequency1 +
+    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
+    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+
+# computes slope for frequency for Grade 1 and hard letter (f)
+slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
+
+# plotting it
+par(mfrow = c(1, 2) )
+
+plotPost(
+    paramSampleVec = slope_t,
+    showMode = FALSE, compVal = 0,
+    xlab = expression(paste(beta[frequency][paste("[", Grade1-t, "]")] ) )
+    )
+
+plotPost(
+    paramSampleVec = slope_f,
+    showMode = FALSE, compVal = 0,
+    xlab = expression(paste(beta[frequency][paste("[", Grade1-f, "]")] ) )
+    )
+
+par(mfrow = c(1, 1) )
+```
+
+## Mean velocity
+
+Table \ref{tab:velocity-summary} reports the estimates (median of the posterior distribution) and associated 95% credible intervals and $\text{BF}$s for all parameters regarding the mean velocity.
+
+```{r velocity-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# prints a summary of the model
+model_summary_velocity <-
+  summary(object = mod2, prob = 0.95, robust = TRUE)$fixed %>%
+  data.frame %>%
+  rownames_to_column(var = "Parameter") %>%
+  filter(str_detect(Parameter, "meanvelocity") ) %>%
+  dplyr::select(-Bulk_ESS, -Tail_ESS) %>%
+  magrittr::set_colnames(c("Term", "Estimate", "MAD", "Lower", "Upper", "Rhat") ) %>%
+  # compute BF for each effect
+  mutate(BF10 = 1 / hypothesis(mod2, glue("{Term} = 0") )$hypothesis$Evid.Ratio) %>%
+  # round BFs
+  mutate(BF10 = ifelse(BF10 > 1000, changeSciNot(BF10), round(BF10, 3) ) ) %>%
+  # if numeric, round to 3 decimals
+  mutate_if(is.numeric, round, 3) %>%
+  # removes the extra variable name
+  mutate(Term = gsub(pattern = "meanvelocity_", replacement = "", x = Term) ) %>%
+  # and the 1s
+  mutate(Term = gsub(pattern = "1", replacement = "", x = Term) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = model_summary_velocity,
+    placement = "htb",
+    align = rep("c", 7),
+    digits = c(0, 3, 3, 3, 3, 3, 3),
+    caption = "Estimates and BFs for the slopes for the mean velocity.",
+    note = "For each slope (for each line), the first two columns represent the
+    estimated most probable value and its standard error (SE). The 'Lower' and
+    'Upper' columns contain the lower and upper bounds of the 95% CrI, whereas
+    the 'Rhat' column reports the Gelman-Rubin statistic. The last column reports
+    the Bayes factor in favour of the alternative hypothesis, relative to the
+    null hypothesis (BF10).",
+    escape = TRUE,
+    landscape = TRUE,
+    font_size = "scriptsize"
+    )
+```
+
+These estimations are better understood visually. Thus, we plot the predictions of this model against raw data in Figure \ref{fig:velocity-predictions-plot}.
+
+```{r velocity-predictions, echo = TRUE, eval = TRUE}
+# retrieving the model's predictions
+velocity_predictions <- df2 %>%
+    data_grid(graphomotor_difficulty, grapheme_complexity, frequency, group) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "meanvelocity",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    dplyr::rename(estimate = Estimate, mad = Est.Error, lower = Q2.5, upper = Q97.5)
+```
+
+```{r velocity-predictions-plot, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Mean velocity by grade and word frequency (x-axis), grapheme complexity (in colour), and graphomotor difficulty (in panels). Transparent points represent individual data per participant. The surimposed dots and intervals represent the model's predictions (median and 95\\% credible interval of the posterior distribution)."}
+# plotting raw data along with the model's predictions
+df2 %>%
+    ggplot(
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = mean_velocity,
+            colour = grapheme_complexity,
+            fill = grapheme_complexity,
+            group = grapheme_complexity
+            )
+        ) +
+    # plotting the raw data
+    geom_quasirandom(
+        dodge.width = 0.75,
+        width = 0.2, size = 1.5,
+        alpha = 0.2, show.legend = FALSE
+        ) +
+    # plotting the model's predictions
+    geom_line(
+        data = velocity_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate,
+            group = interaction(group, grapheme_complexity),
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    geom_pointrange(
+        data = velocity_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate, ymin = lower, ymax = upper,
+            group = grapheme_complexity,
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1, fatten = 2,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    labs(
+        x = "",
+        y = "Mean velocity (in mm per second)",
+        colour = "Grapheme complexity",
+        fill = "Grapheme complexity"
+        ) +
+    facet_wrap(~graphomotor_difficulty) +
+    theme_bw(base_size = 12, base_family = "Open Sans") +
+    scale_colour_brewer(palette = "Dark2") +
+    scale_fill_brewer(palette = "Dark2") +
+    ylim(0, NA) +
+    theme(legend.position = "top") +
+    coord_cartesian(ylim = c(0, 50) )
+```
+
+As can be seen in Figure \ref{fig:velocity-predictions-plot}, the model most notably predicts higher velocity for hard letters as compared to easy letters, excepted for low frequency words in Grade 1. First graders seem to have lower velocity than third graders, who themselves seem to have lower velocity than fifth graders on average. As can be seen from Table \ref{tab:velocity-summary}, BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as between Grade 1 and Grade 5 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:velocity-predictions-summary}.
+
+```{r velocity-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# retrieving the model's predictions
+velocity_predictions <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "meanvelocity",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    magrittr::set_colnames(c(
+        "Group", "Frequency", "Grapheme complexity", "Graphomotor difficulty",
+        "Estimate", "MAD", "Lower", "Upper"
+        ) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = velocity_predictions,
+    placement = "htb",
+    align = rep("c", 8),
+    digits = c(0, 0, 0, 0, 3, 3, 3, 3),
+    caption = "Estimated mean velocity in each condition.",
+    note = "For each condition, the 'Estimate' and 'MAD' columns contain the
+    median and the median absolute deviation (MAD) of the posterior distribution,
+    respectively. The 'Lower' and 'Upper' columns contain the lower and upper
+    bounds of the 95% credible interval.",
+    escape = TRUE,
+    landscape = FALSE,
+    font_size = "scriptsize"
+    )
+```
+
+## Letter size
+
+Table \ref{tab:size-summary} reports the estimates (median of the posterior distribution) and associated 95% credible intervals and $\text{BF}$s for all parameters regarding the letter size.
+
+```{r size-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# prints a summary of the model
+model_summary_size <-
+  summary(object = mod2, prob = 0.95, robust = TRUE)$fixed %>%
+  data.frame %>%
+  rownames_to_column(var = "Parameter") %>%
+  filter(str_detect(Parameter, "lettersize") ) %>%
+  dplyr::select(-Bulk_ESS, -Tail_ESS) %>%
+  magrittr::set_colnames(c("Term", "Estimate", "MAD", "Lower", "Upper", "Rhat") ) %>%
+  # compute BF for each effect
+  mutate(BF10 = 1 / hypothesis(mod2, glue("{Term} = 0") )$hypothesis$Evid.Ratio) %>%
+  # round BFs
+  mutate(BF10 = ifelse(abs(BF10) > 1000, changeSciNot(BF10), round(BF10, 3) ) ) %>%
+  # mutate(BF10 = ifelse(BF10 < 0, changeSciNot(abs(BF10) ), round(abs(BF10), 3) ) ) %>%
+  # if numeric, round to 3 decimals
+  mutate_if(is.numeric, round, 3) %>%
+  # removes the extra variable name
+  mutate(Term = gsub(pattern = "lettersize_", replacement = "", x = Term) ) %>%
+  # and the 1s
+  mutate(Term = gsub(pattern = "1", replacement = "", x = Term) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = model_summary_size,
+    placement = "htb",
+    align = rep("c", 7),
+    digits = c(0, 3, 3, 3, 3, 3, 3),
+    caption = "Estimates and BFs for the slopes for the letter size.",
+    note = "For each slope (for each line), the first two columns represent the
+    estimated most probable value and its standard error (SE). The 'Lower' and
+    'Upper' columns contain the lower and upper bounds of the 95% CrI, whereas
+    the 'Rhat' column reports the Gelman-Rubin statistic. The last column reports
+    the Bayes factor in favour of the alternative hypothesis, relative to the
+    null hypothesis (BF10).",
+    escape = TRUE,
+    landscape = TRUE,
+    font_size = "scriptsize"
+    )
+```
+
+These estimations are better understood visually. Thus, we plot the predictions of this model against raw data in Figure \ref{fig:size-predictions-plot}.
+
+```{r size-predictions, echo = TRUE, eval = TRUE}
+# retrieving the model's predictions
+size_predictions <- df2 %>%
+    data_grid(graphomotor_difficulty, grapheme_complexity, frequency, group) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "lettersize",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    dplyr::rename(estimate = Estimate, mad = Est.Error, lower = Q2.5, upper = Q97.5)
+```
+
+```{r size-predictions-plot, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Letter size by grade and word frequency (x-axis), grapheme complexity (in colour), and graphomotor difficulty (in panels). Transparent points represent individual data per participant. The surimposed dots and intervals represent the model's predictions (median and 95\\% credible interval of the posterior distribution)."}
+# plotting raw data along with the model's predictions
+df2 %>%
+    ggplot(
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = letter_size,
+            colour = grapheme_complexity,
+            fill = grapheme_complexity,
+            group = grapheme_complexity
+            )
+        ) +
+    # plotting the raw data
+    geom_quasirandom(
+        dodge.width = 0.75,
+        width = 0.2, size = 1.5,
+        alpha = 0.2, show.legend = FALSE
+        ) +
+    # plotting the model's predictions
+    geom_line(
+        data = size_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate,
+            group = interaction(group, grapheme_complexity),
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    geom_pointrange(
+        data = size_predictions,
+        aes(
+            x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+            y = estimate, ymin = lower, ymax = upper,
+            group = grapheme_complexity,
+            colour = grapheme_complexity
+            ),
+        inherit.aes = FALSE,
+        size = 1, fatten = 2,
+        position = position_dodge(width = 0.75),
+        show.legend = TRUE
+        ) +
+    labs(
+        x = "",
+        y = "Letter size (in mm)",
+        colour = "Grapheme complexity",
+        fill = "Grapheme complexity"
+        ) +
+    facet_wrap(~graphomotor_difficulty) +
+    theme_bw(base_size = 12, base_family = "Open Sans") +
+    scale_colour_brewer(palette = "Dark2") +
+    scale_fill_brewer(palette = "Dark2") +
+    ylim(0, NA) +
+    theme(legend.position = "top") +
+    coord_cartesian(ylim = c(0, 30) )
+```
+
+As can be seen in Figure \ref{fig:size-predictions-plot}, the production of difficult letters was associated with greater letter size than the production of easy letters for all grades. As can be seen from Table \ref{tab:size-summary}, BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_size %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_size %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 5 (`r glue_data(model_summary_size %>% dplyr::filter(Term == "groupGrade5:graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:size-predictions-summary}.
+
+```{r size-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
+# retrieving the model's predictions
+size_predictions <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    cbind(., fitted(
+        object = mod2, newdata = ., resp = "lettersize",
+        scale = "response", probs = c(0.025, 0.975),
+        re_formula = NA, robust = TRUE
+        ) ) %>%
+    ungroup %>%
+    magrittr::set_colnames(c(
+        "Group", "Frequency", "Grapheme complexity", "Graphomotor difficulty",
+        "Estimate", "MAD", "Lower", "Upper"
+        ) )
+
+########################
+# outputting the table #
+########################
+
+apa_table(
+    x = size_predictions,
+    placement = "htb",
+    align = rep("c", 8),
+    digits = c(0, 0, 0, 0, 3, 3, 3, 3),
+    caption = "Estimated letter size in each condition.",
+    note = "For each condition, the 'Estimate' and 'MAD' columns contain the
+    median and the median absolute deviation (MAD) of the posterior distribution,
+    respectively. The 'Lower' and 'Upper' columns contain the lower and upper
+    bounds of the 95% credible interval.",
+    escape = TRUE,
+    landscape = FALSE,
+    font_size = "scriptsize"
+    )
+```
+
+<!--
+
+```{r posterior-slopes-drift, echo = FALSE, eval = FALSE, out.width = "100%", fig.asp = 0.5, fig.cap = "Posterior distribution of the slopes for the drift rate, for Group, Prime, and Cong (respectively). The mode (i.e., the most probable value) and the 95\\% credible interval are also displayed."}
+# retrieves the posterior samples for the average drift rate
+posterior_slopes_drift <- post[, 5:7]
+# plotting it
+par(mfrow = c(1, 3) )
+plotPost(
+  posterior_slopes_drift[, 1], showMode = TRUE, compVal = 0,
+  xlab = expression(paste(beta[delta], "Group") )
+  )
+plotPost(
+  posterior_slopes_drift[, 2], showMode = TRUE,# compVal = 0,
+  xlab = expression(paste(beta[delta], "Cong") )
+  )
+plotPost(
+  posterior_slopes_drift[, 3], showMode = TRUE, compVal = 0,
+  xlab = expression(paste(beta[delta], "Prime") )
+  )
+```
+
+Figure \ref{fig:posterior-slopes-drift} reveals that `Cong` increased the drift rate whereas `Prime` decreased it (recall that the drift rate can be interpreted as the "ease of processing"),^[As `Cong` and `Prime` were coded using sum contrasts (-0.5 vs. 0.5), these effects can be interpreted as follows: going from incongruent to congruent stimuli or to HSF to LSF stimuli is associated with "more" ease of processing.] whereas the effect of `Group` is estimated to be quasi null (cf. later hypothesis testing). What about interactions?
+
+```{r posterior-bias-difference, echo = FALSE, eval = FALSE, fig.asp = 1, out.width = "50%", fig.cap = "Posterior distribution of the difference between the estimated starting point in the ASD group and the estimated starting point in the TD group."}
+# computes the posterior distribution of the group difference in the bias parameter
+posterior_bias_group_difference <- posterior_bias_asd - posterior_bias_td
+# plotting it
+par(mfrow = c(1, 1) )
+plotPost(
+  posterior_bias_group_difference, showMode = TRUE, compVal = 0,
+  xlab = expression(paste(beta["ASD"]) - paste(beta["TD"]) )
+  )
+```
+
+As shown in Figure \ref{fig:posterior-bias-prime}, the effect of `Prime` was positive, which means that HSF (vs. LSF) primes were associated with a "bias" towards accurate responses. No interaction effect was found between `Group` and `Prime`.
+
+```{r posterior-bias-prime, echo = FALSE, eval = FALSE, fig.asp = 1, out.width = "50%", fig.cap = "Posterior distribution of the odds ratio between LSF and HSF primes on the starting point."}
+# plotting it
+par(mfrow = c(1, 1) )
+plotPost(
+  exp(posterior_slope_bias_prime), showMode = TRUE,
+  xlab = expression(exp(paste(beta["prime"][paste("[", beta, "]")] ) ) )
+  )
+```
+
+Recall that the non-decision time parameter can be interpreted as a measure of the time used by non-decisional processes such as stimulus encoding or motor response, and that the linear model for this parameter is on the log scale (i.e., we used a log link function): $\log(\tau_{i}) = \beta_{0} + \beta_{1} \cdot \text{Group}_{i}$.
+
+```{r posterior-ndt, echo = FALSE, eval = FALSE, out.width = "75%", fig.asp = 1, fig.cap = "Posterior distribution of the intercept and the slope for Group for the non-decision time. The upper two distributions are the distributions of the intercept and the slope (on the linear scale). The lower two plots are the posterior distributions of the non-decision time in the TD and ASD groups, respectively (on the linear scale)."}
+# retrieves the posterior samples for the boundary-separation
+posterior_intercept_ndt <- post$b_ndt_Intercept
+posterior_slope_ndt <- post$b_ndt_GroupC
+# computes the posterior distribution of the NDT for the TD group
+posterior_ndt_td <- exp(posterior_intercept_ndt - 0.5 * posterior_slope_ndt)
+# computes the posterior distribution of the NDT for the ASD group
+posterior_ndt_asd <- exp(posterior_intercept_ndt + 0.5 * posterior_slope_ndt)
+# plotting it
+par(mfrow = c(2, 2) )
+plotPost(
+  exp(posterior_intercept_ndt), showMode = TRUE, # compVal = 0,
+  xlab = expression(exp(paste(beta[0][paste("[", tau, "]")] ) ) )
+  )
+plotPost(
+  exp(posterior_slope_ndt), showMode = TRUE, # compVal = 0,
+  xlab = expression(exp(paste(beta["group"][paste("[", tau, "]")] ) ) )
+  )
+plotPost(
+  posterior_ndt_td, showMode = TRUE, # compVal = 0,
+  xlab = expression(paste(tau["TD"]) )
+  )
+plotPost(
+  posterior_ndt_asd, showMode = TRUE, # compVal = 0,
+  xlab = expression(paste(tau["ASD"]) )
+  )
+```
+
+Therefore, we have to apply the inverse link function (i.e., $\exp(\cdot)$) to the parameter to be able to interpret it. Taking $\exp(\beta_{1})$ gives the proportional change in the value of the non-decision time parameter when we go from the TD group to the ASD group. In our case, $\exp(\beta_{1}) \approx 1.24$ which means that going from TD to ASD leads to an increase of approximately 24% of the non-decision time parameter value. In other words, non-decisional processes seem to take longer in the ASD group than in the TD group.
+
+# Conclusions
+
+...
+
+-->
+
+# Acknowledgments
+
+This work, carried out within the Labex BLRI (ANR-11-LABX-0036) and the Institut Convergence ILCB (ANR-16-CONV-0002), has benefited from support from the French Government, managed by the French National Agency for Research (ANR), under the project title DYSTACMAP (ANR-13-APPR-0010).
+
+\newpage
+
+# Session information
+
+```{r create_r-references, echo = FALSE, cache = FALSE}
+papaja::r_refs(file = "bib/r-references.bib")
+```
+
+```{r, echo = TRUE, cache = FALSE}
+sessionInfo()
+```
+
+\newpage
+
+# References
