@@ -4,7 +4,7 @@ shorttitle: "Supplementary Materials"
 author: 
   - name          : Jérémy Danna
     affiliation   : 1
-    corresponding : yes # defines only one corresponding author
+    corresponding : yes
     address       : Laboratoire de Neurosciences Cognitives, Pôle 3C, Case C, 3 Place Victor Hugo, 13331 Marseille Cedex 03, France 
     email         : jeremy.danna@univ-amu.fr
   - name          : Marieke Longcamp
@@ -26,7 +26,7 @@ affiliation:
     institution: Aix Marseille Univ, PSYCLE, Aix-en-Provence, France
 bibliography: [bib/constraints.bib, bib/r-references.bib]
 figsintext: true
-class: doc # man, doc, jou
+class: doc
 link-citations: true
 fontsize: 11pt
 linestretch: 1.25
@@ -36,13 +36,11 @@ output:
   papaja::apa6_pdf:
     toc: true
     toc_depth: 3
-    highlight: "pygments" # css/github.css
+    highlight: "pygments"
     number_sections: true
     latex_engine: xelatex
 header-includes:
   - \usepackage{float}
-editor_options: 
-  chunk_output_type: console
 ---
 
 \newpage
@@ -53,6 +51,7 @@ library(ggbeeswarm)
 library(tidyverse)
 library(patchwork)
 library(posterior)
+library(tidybayes)
 library(modelr)
 library(GGally)
 library(readxl)
@@ -61,28 +60,6 @@ library(knitr)
 library(glue)
 library(BEST)
 library(brms)
-
-# options(kableExtra.auto_format = FALSE)
-# Sys.setenv(LANG = "en")
-
-# inline_hook <- function (x) {
-#   
-#   if (is.numeric(x) ) {
-#     
-#     # if integer, print without decimal; otherwise print two places
-#     res <- ifelse(
-#       x == round(x),
-#       sprintf("%d", x),
-#       sprintf("%.3f", x)
-#       )
-#     
-#     paste(res, collapse = ", ")
-#     
-#   }
-#   
-# }
-
-# knit_hooks$set(inline = inline_hook)
 
 knitr::opts_chunk$set(
   eval = TRUE, echo = TRUE, cache = TRUE,
@@ -225,7 +202,6 @@ Figure \ref{fig:correlation} shows the overall and by-grade Spearman correlation
 
 ```{r correlation, echo = FALSE, out.width = "100%", fig.width = 10, fig.height = 10, fig.cap = "Overall and by-grade Spearman correlation between each pair of measured variables."}
 # plotting a correlation matrix
-# https://www.r-graph-gallery.com/199-correlation-matrix-with-ggally.html
 ggpairs(
     data = df2,
     mapping = ggplot2::aes(colour = group),
@@ -311,22 +287,6 @@ y_{i} &\sim \mathrm{Poisson}(\lambda_{i})\\
 $$
 
 This kind of model is now able to predict valid number of stops (i.e., positive integers). Note that for simplicity, we omit the varying effects and the priors from the above model [for more details on Poisson regression, see @winter_poisson_2021].
-
-<!--
-
-But it still can not account for sur-represented zero values in some groups (e.g., in the number of stops in Grade-2 and Grade-3 children, cf. Figure \ref{fig:data}). To fix this issue, we describe below a zero-inflated poisson regression model, where the number of stops can arise as the result of two distinct processes (i.e., a kind of mixture model). In our case, we consider that the number of stops may depend on writing expertise (for which grade is considered to be a proxy). Once writing is automatised, we do not expect stops. The probability of taping into this "zero-stop" process is given by the mixture probability $p_{i}$. This results in the following model:
-
-$$
-\begin{aligned}
-y &\sim \mathrm{ZIPoisson}(p_{i}, \lambda_{i})\\
-\text{logit}(p_{i}) &= \alpha_{p}\\
-\log(\lambda_{i}) &= \alpha_{\lambda} + \beta_{\lambda g} \cdot \text{grade}_{i} + \beta_{f} \cdot \text{freq}_{i} +\\ &\quad  \beta_{graphe} \cdot \text{grapheme}_{i} + \beta_{grapho} \cdot \text{graphomotor}_{i}\\
-\end{aligned}
-$$
-
-where the mixture probability $p_{i}$ is assigned its own intercept $\alpha_{p}$ (estimating the average probability of zero error).
-
--->
 
 ## Fitting the final model
 
@@ -490,7 +450,7 @@ data.frame(posterior = hyp$samples$H1, prior = hyp$prior_samples$H1) %>%
   coord_cartesian(xlim = c(-2, 2) )
 ```
 
-The resulting Bayes factor (called "Evid. Ratio" in the output) may be interpreted as follows: the observed data are `r round(hyp$hypothesis$Evid.Ratio, 2)` more likely under the hypothesis of null effect than under the hypothesis of a non-null effect. From the BF in favour of the null hypothesis (relative to the alternative hypothesis), we can compute the BF in favour of the alternative hypothesis (relative to the null hypothesis), using $\text{BF}_{10} = 1 / \text{BF}_{01}$ (we report the $\text{BF}_{10}$ in the following). Alternatively, the BF can be interpreted as an *updating factor*, indicating by "how much" we should update our *prior odds* (the ratio of the a priori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$) to convert them into *posterior odds* (the ratio of the a posteriori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$).
+The resulting Bayes factor (BF, called "Evid. Ratio" in the output) may be interpreted as follows: the observed data are `r round(hyp$hypothesis$Evid.Ratio, 2)` more likely under the hypothesis of null effect than under the hypothesis of a non-null effect. From the BF in favour of the null hypothesis (relative to the alternative hypothesis), we can compute the BF in favour of the alternative hypothesis (relative to the null hypothesis), using $\text{BF}_{10} = 1 / \text{BF}_{01}$ (we report the $\text{BF}_{10}$ in the following). Alternatively, the BF can be interpreted as an *updating factor*, indicating by "how much" we should update our *prior odds* (the ratio of the a priori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$) to convert them into *posterior odds* (the ratio of the a posteriori probability of $\mathcal{H}_{0}$ versus $\mathcal{H}_{1}$).
 
 \newpage
 
@@ -530,18 +490,6 @@ Recall that we used a logarithmic link function, therefore the median letter dur
 Table \ref{tab:duration-summary} reports the estimates (median of the posterior distribution) and associated 95% credible intervals and $\text{BF}$s for all parameters regarding the letter duration variable.
 
 ```{r duration-summary, eval = TRUE, echo = FALSE, results = "asis"}
-# formatting BFs in table
-# changeSciNot <- function(n) {
-#   
-#   n <- ifelse(n < 0, abs(n), n)
-#   output <- format(n, digits = 4, scientific = TRUE)
-#   output <- sub("e", "x10^", output)
-#   output <- sub("\\+0?", "", output)
-#   output <- sub("-0?", "-", output)
-#   output
-#   
-# }
-
 # prints a summary of the model
 model_summary_duration <-
   summary(object = mod2, prob = 0.95, robust = TRUE)$fixed %>%
@@ -694,6 +642,113 @@ apa_table(
     font_size = "scriptsize"
     )
 ```
+
+The output of a Bayesian model is a (joint) posterior distribution over all parameters of the model. We can marginalise this joint distribution to obtain the (marginal) posterior distribution on each parameter. To summarise this distribution, we can retrieve samples from the joint posterior distribution. Interestingly, this means we can look at the posterior distribution of any parameter of interest. For instance, and for exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
+
+```{r posterior-duration, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on letter duration (in seconds) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+###############################################################
+# Computing the effect of frequency for each letter and Grade #
+###############################################################
+
+duration_predictions_samples <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    add_epred_draws(
+        object = mod2,
+        resp = "duration",
+        scale = "linear", probs = c(0.025, 0.975),
+        re_formula = NA
+        )
+
+par(mfrow = c(2, 3) )
+
+freq_t_grade1_hf <- duration_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade1_lf <- duration_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade1_hf - freq_t_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 1"
+    )
+
+freq_t_grade3_hf <- duration_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade3_lf <- duration_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade3_hf - freq_t_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 3"
+    )
+
+freq_t_grade5_hf <- duration_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade5_lf <- duration_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade5_hf - freq_t_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 5"
+    )
+
+freq_f_grade1_hf <- duration_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade1_lf <- duration_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade1_hf - freq_f_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 1"
+    )
+
+freq_f_grade3_hf <- duration_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade3_lf <- duration_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade3_hf - freq_f_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 3"
+    )
+
+freq_f_grade5_hf <- duration_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade5_lf <- duration_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade5_hf - freq_f_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 5"
+    )
+
+par(mfrow = c(1, 1) )
+```
+
+As can be seen in Figure \ref{fig:posterior-duration}, the posterior distribution for the effect of frequency is almost perfectly centred on zero in all conditions, except for letter f in Grade 1. Although the 95% credible interval largely encompasses 0 in this condition as well, there is still a `r round(mean((freq_f_grade1_hf - freq_f_grade1_lf) < 0), 3)` probability that the effect of frequency on letter duration is negative (given the data and the priors).
 
 ## Number of stops
 
@@ -854,154 +909,112 @@ apa_table(
     )
 ```
 
-```{r posterior-duration, echo = FALSE, eval = FALSE}
-# Now that we have fitted the model, we are left with the task of interpreting the output from the model. The output of the model is a (joint) posterior distribution over all parameters of the model. We can marginalise this joint distribution to obtain the (marginal) posterior distribution on each parameter. To summarise this distribution, we can retrieve samples from the joint posterior distribution.
+For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-#############################################################################
-# average predictions in the linear scale
-######################################################################
+```{r posterior-stops, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the number of stops for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+###############################################################
+# Computing the effect of frequency for each letter and Grade #
+###############################################################
 
-duration_predictions <- df2 %>%
+stops_predictions_samples <- df2 %>%
     data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
-    cbind(., fitted(
-        object = mod2, newdata = ., resp = "duration",
+    add_epred_draws(
+        object = mod2,
+        resp = "numberofstops",
         scale = "linear", probs = c(0.025, 0.975),
-        re_formula = NA, robust = TRUE
-        ) ) %>%
-    ungroup %>%
-    group_by(group, frequency, graphomotor_difficulty) %>%
-    summarise(moy = mean(Estimate) )
+        re_formula = NA
+        )
 
-# retrieves posterior samples (for all parameters related to letter duration)
-posterior_samples <- posterior_samples(x = mod2, pars = regex("duration") ) %>%
-    # keeps only slopes
-    select(contains(match = "b_") )
+par(mfrow = c(2, 3) )
 
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
-duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
+freq_t_grade1_hf <- stops_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
 
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
-duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# computes slope for frequency for Grade 1 and easy letter (t)
-slope_t <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
-duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
-duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# computes slope for frequency for Grade 1 and hard letter (f)
-slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
-
-########################
-# for grade 3
-####################
-
-# retrieves the posterior samples for the slope for frequency in Grade 3 for the letter "t"
-duration_frequency_grade3_LF <- posterior_samples$b_duration_Intercept +
-    posterior_samples$b_duration_groupGrade3 +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1` +
-    (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1` +
-    (-0.5) * posterior_samples$`b_duration_groupGrade3:graphomotor_difficulty1` +
-    (-0.5) * (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1:graphomotor_difficulty1`
-
-# retrieves the posterior samples for the slope for frequency in Grade 3 for the letter "t"
-duration_frequency_grade3_LF <- posterior_samples$b_duration_Intercept +
-    posterior_samples$b_duration_groupGrade3 +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-    0.5 * posterior_samples$`b_duration_groupGrade3:frequency1` +
-    (-0.5) * posterior_samples$`b_duration_groupGrade3:graphomotor_difficulty1` +
-    0.5 * (-0.5) * posterior_samples$`b_duration_groupGrade3:frequency1:graphomotor_difficulty1`
-
-plotPost(duration_frequency_grade3_LF)
-
-# computes slope for frequency for Grade 3 and easy letter (t)
-slope_t <- duration_frequency_grade3_HF - duration_frequency_grade3_LF
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
-duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
-duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# computes slope for frequency for Grade 1 and hard letter (f)
-slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
-
-########################
-# for grade 5
-####################
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
-duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
-duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    (-0.5) * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * (-0.5) * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# computes slope for frequency for Grade 1 and easy letter (t)
-slope_t <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "t"
-duration_frequency_grade1_LF <- posterior_samples$b_duration_Intercept +
-    (-0.5) * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    (-0.5) * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# retrieves the posterior samples for the slope for frequency in Grade 1 for the letter "f"
-duration_frequency_grade1_HF <- posterior_samples$b_duration_Intercept +
-    0.5 * posterior_samples$b_duration_frequency1 +
-    0.5 * posterior_samples$b_duration_graphomotor_difficulty1 +
-    0.5 * 0.5 * posterior_samples$`b_duration_frequency1:graphomotor_difficulty1`
-
-# computes slope for frequency for Grade 1 and hard letter (f)
-slope_f <- duration_frequency_grade1_HF - duration_frequency_grade1_LF
-
-# plotting it
-par(mfrow = c(1, 2) )
+freq_t_grade1_lf <- stops_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
 
 plotPost(
-    paramSampleVec = slope_t,
-    showMode = FALSE, compVal = 0,
-    xlab = expression(paste(beta[frequency][paste("[", Grade1-t, "]")] ) )
+    paramSampleVec = freq_t_grade1_hf - freq_t_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 1"
     )
 
+freq_t_grade3_hf <- stops_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade3_lf <- stops_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
 plotPost(
-    paramSampleVec = slope_f,
-    showMode = FALSE, compVal = 0,
-    xlab = expression(paste(beta[frequency][paste("[", Grade1-f, "]")] ) )
+    paramSampleVec = freq_t_grade3_hf - freq_t_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 3"
+    )
+
+freq_t_grade5_hf <- stops_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade5_lf <- stops_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade5_hf - freq_t_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 5"
+    )
+
+freq_f_grade1_hf <- stops_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade1_lf <- stops_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade1_hf - freq_f_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 1"
+    )
+
+freq_f_grade3_hf <- stops_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade3_lf <- stops_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade3_hf - freq_f_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 3"
+    )
+
+freq_f_grade5_hf <- stops_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade5_lf <- stops_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade5_hf - freq_f_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 5"
     )
 
 par(mfrow = c(1, 1) )
 ```
+
+As can be seen in Figure \ref{fig:posterior-stops}, the posterior distribution for the effect of frequency is almost perfectly centred on zero in all conditions, except for letter f in Grade 1. In this condition, the 95% credible interval excludes 0 and there is a `r round(mean((freq_f_grade1_hf - freq_f_grade1_lf) < 0), 3)` probability that the effect of frequency on the number of stops is negative (given the data and the priors).
 
 ## Mean velocity
 
@@ -1160,6 +1173,113 @@ apa_table(
     font_size = "scriptsize"
     )
 ```
+
+For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
+
+```{r posterior-velocity, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the mean velocity (in mm per second) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+###############################################################
+# Computing the effect of frequency for each letter and Grade #
+###############################################################
+
+velocity_predictions_samples <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    add_epred_draws(
+        object = mod2,
+        resp = "meanvelocity",
+        scale = "linear", probs = c(0.025, 0.975),
+        re_formula = NA
+        )
+
+par(mfrow = c(2, 3) )
+
+freq_t_grade1_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade1_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade1_hf - freq_t_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 1"
+    )
+
+freq_t_grade3_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade3_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade3_hf - freq_t_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 3"
+    )
+
+freq_t_grade5_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade5_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade5_hf - freq_t_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 5"
+    )
+
+freq_f_grade1_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade1_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade1_hf - freq_f_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 1"
+    )
+
+freq_f_grade3_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade3_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade3_hf - freq_f_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 3"
+    )
+
+freq_f_grade5_hf <- velocity_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade5_lf <- velocity_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade5_hf - freq_f_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 5"
+    )
+
+par(mfrow = c(1, 1) )
+```
+
+As can be seen in Figure \ref{fig:posterior-velocity}, the posterior distribution for the effect of frequency is almost perfectly centred on zero in all conditions, except for letter f in Grade 1. In this condition, there is a `r round(mean((freq_f_grade1_hf - freq_f_grade1_lf) > 0), 3)` probability that the effect of frequency on the mean velocity (in mm per second) is positive (given the data and the priors).
 
 ## Letter size
 
@@ -1320,88 +1440,112 @@ apa_table(
     )
 ```
 
-<!--
+For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-```{r posterior-slopes-drift, echo = FALSE, eval = FALSE, out.width = "100%", fig.asp = 0.5, fig.cap = "Posterior distribution of the slopes for the drift rate, for Group, Prime, and Cong (respectively). The mode (i.e., the most probable value) and the 95\\% credible interval are also displayed."}
-# retrieves the posterior samples for the average drift rate
-posterior_slopes_drift <- post[, 5:7]
-# plotting it
-par(mfrow = c(1, 3) )
-plotPost(
-  posterior_slopes_drift[, 1], showMode = TRUE, compVal = 0,
-  xlab = expression(paste(beta[delta], "Group") )
-  )
-plotPost(
-  posterior_slopes_drift[, 2], showMode = TRUE,# compVal = 0,
-  xlab = expression(paste(beta[delta], "Cong") )
-  )
-plotPost(
-  posterior_slopes_drift[, 3], showMode = TRUE, compVal = 0,
-  xlab = expression(paste(beta[delta], "Prime") )
-  )
-```
+```{r posterior-size, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the letter size (in mm) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+###############################################################
+# Computing the effect of frequency for each letter and Grade #
+###############################################################
 
-Figure \ref{fig:posterior-slopes-drift} reveals that `Cong` increased the drift rate whereas `Prime` decreased it (recall that the drift rate can be interpreted as the "ease of processing"),^[As `Cong` and `Prime` were coded using sum contrasts (-0.5 vs. 0.5), these effects can be interpreted as follows: going from incongruent to congruent stimuli or to HSF to LSF stimuli is associated with "more" ease of processing.] whereas the effect of `Group` is estimated to be quasi null (cf. later hypothesis testing). What about interactions?
+size_predictions_samples <- df2 %>%
+    data_grid(group, frequency, grapheme_complexity, graphomotor_difficulty) %>%
+    add_epred_draws(
+        object = mod2,
+        resp = "lettersize",
+        scale = "linear", probs = c(0.025, 0.975),
+        re_formula = NA
+        )
 
-```{r posterior-bias-difference, echo = FALSE, eval = FALSE, fig.asp = 1, out.width = "50%", fig.cap = "Posterior distribution of the difference between the estimated starting point in the ASD group and the estimated starting point in the TD group."}
-# computes the posterior distribution of the group difference in the bias parameter
-posterior_bias_group_difference <- posterior_bias_asd - posterior_bias_td
-# plotting it
+par(mfrow = c(2, 3) )
+
+freq_t_grade1_hf <- size_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade1_lf <- size_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade1_hf - freq_t_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 1"
+    )
+
+freq_t_grade3_hf <- size_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade3_lf <- size_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade3_hf - freq_t_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 3"
+    )
+
+freq_t_grade5_hf <- size_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+freq_t_grade5_lf <- size_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "t") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_t_grade5_hf - freq_t_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter t in Grade 5"
+    )
+
+freq_f_grade1_hf <- size_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade1_lf <- size_predictions_samples %>%
+    filter(group == "Grade1" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade1_hf - freq_f_grade1_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 1"
+    )
+
+freq_f_grade3_hf <- size_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade3_lf <- size_predictions_samples %>%
+    filter(group == "Grade3" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade3_hf - freq_f_grade3_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 3"
+    )
+
+freq_f_grade5_hf <- size_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "HF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+freq_f_grade5_lf <- size_predictions_samples %>%
+    filter(group == "Grade5" & frequency == "LF" & graphomotor_difficulty == "f") %>%
+    pull(.epred)
+
+plotPost(
+    paramSampleVec = freq_f_grade5_hf - freq_f_grade5_lf,
+    showMode = FALSE, compVal = 0, # ROPE = c(-0.1, 0.1),
+    xlab = "Effect of frequency for letter f in Grade 5"
+    )
+
 par(mfrow = c(1, 1) )
-plotPost(
-  posterior_bias_group_difference, showMode = TRUE, compVal = 0,
-  xlab = expression(paste(beta["ASD"]) - paste(beta["TD"]) )
-  )
 ```
 
-As shown in Figure \ref{fig:posterior-bias-prime}, the effect of `Prime` was positive, which means that HSF (vs. LSF) primes were associated with a "bias" towards accurate responses. No interaction effect was found between `Group` and `Prime`.
-
-```{r posterior-bias-prime, echo = FALSE, eval = FALSE, fig.asp = 1, out.width = "50%", fig.cap = "Posterior distribution of the odds ratio between LSF and HSF primes on the starting point."}
-# plotting it
-par(mfrow = c(1, 1) )
-plotPost(
-  exp(posterior_slope_bias_prime), showMode = TRUE,
-  xlab = expression(exp(paste(beta["prime"][paste("[", beta, "]")] ) ) )
-  )
-```
-
-Recall that the non-decision time parameter can be interpreted as a measure of the time used by non-decisional processes such as stimulus encoding or motor response, and that the linear model for this parameter is on the log scale (i.e., we used a log link function): $\log(\tau_{i}) = \beta_{0} + \beta_{1} \cdot \text{Group}_{i}$.
-
-```{r posterior-ndt, echo = FALSE, eval = FALSE, out.width = "75%", fig.asp = 1, fig.cap = "Posterior distribution of the intercept and the slope for Group for the non-decision time. The upper two distributions are the distributions of the intercept and the slope (on the linear scale). The lower two plots are the posterior distributions of the non-decision time in the TD and ASD groups, respectively (on the linear scale)."}
-# retrieves the posterior samples for the boundary-separation
-posterior_intercept_ndt <- post$b_ndt_Intercept
-posterior_slope_ndt <- post$b_ndt_GroupC
-# computes the posterior distribution of the NDT for the TD group
-posterior_ndt_td <- exp(posterior_intercept_ndt - 0.5 * posterior_slope_ndt)
-# computes the posterior distribution of the NDT for the ASD group
-posterior_ndt_asd <- exp(posterior_intercept_ndt + 0.5 * posterior_slope_ndt)
-# plotting it
-par(mfrow = c(2, 2) )
-plotPost(
-  exp(posterior_intercept_ndt), showMode = TRUE, # compVal = 0,
-  xlab = expression(exp(paste(beta[0][paste("[", tau, "]")] ) ) )
-  )
-plotPost(
-  exp(posterior_slope_ndt), showMode = TRUE, # compVal = 0,
-  xlab = expression(exp(paste(beta["group"][paste("[", tau, "]")] ) ) )
-  )
-plotPost(
-  posterior_ndt_td, showMode = TRUE, # compVal = 0,
-  xlab = expression(paste(tau["TD"]) )
-  )
-plotPost(
-  posterior_ndt_asd, showMode = TRUE, # compVal = 0,
-  xlab = expression(paste(tau["ASD"]) )
-  )
-```
-
-Therefore, we have to apply the inverse link function (i.e., $\exp(\cdot)$) to the parameter to be able to interpret it. Taking $\exp(\beta_{1})$ gives the proportional change in the value of the non-decision time parameter when we go from the TD group to the ASD group. In our case, $\exp(\beta_{1}) \approx 1.24$ which means that going from TD to ASD leads to an increase of approximately 24% of the non-decision time parameter value. In other words, non-decisional processes seem to take longer in the ASD group than in the TD group.
-
-# Conclusions
-
-...
-
--->
+As can be seen in Figure \ref{fig:posterior-size}, the posterior distribution for the effect of frequency is almost perfectly centred on zero in all conditions, except for letter f in Grade 1. In this condition, there is a `r round(mean((freq_f_grade1_hf - freq_f_grade1_lf) > 0), 3)` probability that the effect of frequency on the letter size (in mm) is positive (given the data and the priors).
 
 # Acknowledgments
 
