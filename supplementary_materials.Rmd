@@ -83,7 +83,7 @@ changeSciNot <- function(n) {
 
 ## Univariate raw data exploration
 
-```{r data, echo = FALSE, fig.width = 10, fig.height = 8, out.width = "100%", fig.cap = "Effect of grade, word frequency, and grapheme complexity on the total duration, the number of stops, the mean velocity, and the letter size. The error bars represent the 95\\% confidence intervals of the mean (assuming a Gaussian distribution)."}
+```{r data, echo = FALSE, fig.width = 10, fig.height = 12, out.width = "100%", fig.cap = "Effect of grade, word frequency, and grapheme complexity on the total duration, the number of stops, the mean velocity, and the letter size. The error bars represent the 95\\% confidence intervals of the mean (assuming a Gaussian distribution)."}
 # importing the data
 df <- read_excel(
     path = "data/RAW_DATA_FORMAT_LONG.xlsx",
@@ -139,6 +139,60 @@ contrasts(df2$grapheme_complexity) <- c(-0.5, +0.5)
 contrasts(df2$graphomotor_difficulty) <- c(-0.5, +0.5)
 
 # visual exploration of the data
+# df2 %>%
+#     pivot_longer(cols = duration:letter_size) %>%
+#     mutate(
+#         name = factor(
+#             x = name,
+#             levels = c("duration", "number_of_stops", "mean_velocity", "letter_size"),
+#             labels = c(
+#                 "Duration (in seconds)", "Number of stops",
+#                 "Mean velocity (in mm per second)", "Letter size (in mm)"
+#                 )
+#             )
+#         ) %>%
+#     ggplot(
+#         aes(
+#             x = interaction(frequency, group, sep = "\n", lex.order = FALSE),
+#             y = value,
+#             colour = grapheme_complexity,
+#             fill = grapheme_complexity,
+#             group = interaction(grapheme_complexity, group)
+#             )
+#         ) +
+#     # plotting the raw data
+#     geom_quasirandom(
+#         dodge.width = 0.75,
+#         width = 0.2, size = 1.5,
+#         alpha = 0.15, show.legend = FALSE
+#         ) +
+#     stat_summary(
+#         fun.data = function(x){mean_cl_normal(x, conf.int = 0.95)},
+#         geom = "errorbar", size = 0.75, width = 0, show.legend = FALSE,
+#         position = position_dodge(width = 0.75)
+#         ) +
+#     stat_summary(
+#         fun = mean, geom = "point", size = 1.5,
+#         position = position_dodge(width = 0.75),
+#         show.legend = TRUE
+#         ) +
+#     stat_summary(
+#         fun = mean, geom = "line", size = 0.75,
+#         position = position_dodge(width = 0.75),
+#         show.legend = FALSE
+#         ) +
+#     labs(
+#         x = "",
+#         y = "",
+#         colour = "Grapheme complexity",
+#         fill = "Grapheme complexity"
+#         ) +
+#     facet_wrap(facets = ~name, ncol = 2, scales = "free", shrink = TRUE) +
+#     theme_bw(base_size = 12, base_family = "Open Sans") +
+#     scale_colour_brewer(palette = "Dark2") +
+#     ylim(0, NA) +
+#     theme(legend.position = "top")
+
 df2 %>%
     pivot_longer(cols = duration:letter_size) %>%
     mutate(
@@ -187,7 +241,7 @@ df2 %>%
         colour = "Grapheme complexity",
         fill = "Grapheme complexity"
         ) +
-    facet_wrap(facets = ~name, ncol = 2, scales = "free", shrink = TRUE) +
+    facet_wrap(facets = ~ name * graphomotor_difficulty, ncol = 2, scales = "free", shrink = TRUE) +
     theme_bw(base_size = 12, base_family = "Open Sans") +
     scale_colour_brewer(palette = "Dark2") +
     ylim(0, NA) +
@@ -200,7 +254,7 @@ Figure \ref{fig:data} shows the effect of grade, word frequency, and grapheme co
 
 Figure \ref{fig:correlation} shows the overall and by-grade Spearman correlation between each pair of variables. This figure reveals medium to strong positive and negative correlations between each pair of variable. These relations are sometimes non-linear (e.g., between duration and mean velocity), hence the use of Spearman (rather than Pearson) correlation coefficients.
 
-```{r correlation, echo = FALSE, out.width = "100%", fig.width = 10, fig.height = 10, fig.cap = "Overall and by-grade Spearman correlation between each pair of measured variables."}
+```{r correlation, echo = FALSE, out.width = "75%", fig.width = 8, fig.height = 8, fig.cap = "Overall and by-grade Spearman correlation between each pair of measured variables."}
 # plotting a correlation matrix
 ggpairs(
     data = df2,
@@ -217,7 +271,7 @@ ggpairs(
 
 ## Modelling positive-only values
 
-A dominant feature of durations or response times (RTs) is that their distribution is generally positively skewed, with the spread and/or the skewness increasing with task difficulty [for review, see for instance @forstmann_sequential_2016]. Therefore, several models have been proposed to account for the peculiarities of the data coming from such tasks as well as to relate it to the underlying cognitive processes. We discuss below why using Gaussian models for this kind of data is generally not a sensible idea and describe our approach in more details. We follow a general "Bayesian workflow" by building our model in an iterative manner and by motivating and validating each modelling choice [for more details, see for instance @gelman_bayesian_2020].
+A dominant feature of durations (or response times) is that their distribution is generally positively skewed, with the spread and/or the skewness increasing with task difficulty [for review, see for instance @forstmann_sequential_2016]. Therefore, several models have been proposed to account for the peculiarities of the data coming from such tasks as well as to relate it to the underlying cognitive processes. We discuss below why using Gaussian models for this kind of data is generally not a sensible idea and describe our approach in more details. We follow a general "Bayesian workflow" by building our model in an iterative manner and by motivating and validating each modelling choice [for more details, see for instance @gelman_bayesian_2020].
 
 We first fitted a Bayesian multilevel (also known as "mixed-effects") Gaussian multivariate (i.e., with multiple outcomes) model. One way of evaluating this model is to evaluate its predictions. If this model is a good description of the process that generated the observed data, then it should be able to generate data that looks like the observed data. The process of generating data from the estimated posterior distribution is called *posterior predictive checking* and can be used in many different ways using the `pp_check()` method [@gabry_visualization_2019]. In Figure \ref{fig:positive}, we depict the  distribution of the raw data along with the distribution of 100 simulated datasets.
 
@@ -264,11 +318,10 @@ This figure reveals that the Gaussian model fails to account for the peculiariti
 
 A useful description of RTs or durations should be able to account for the effects of the difficulty of the task, as well as changes in shift and spread of the distribution. The Log-normal, Ex-Gaussian, or Weibull distributions often provide a good fit to these data, but their parameters are difficult to interpret in terms of difficulty, shift, or spread (i.e., these distributions do not have straightforward interpretable parameters). In contrast, the shifted log-normal distribution has parameters that can easily be interpreted in terms of difficulty, shift, and spread.
 
-The log-normal distribution is called "log-normal" because the parameters are the mean and standard deviation of the log-transformed response times, which is assumed to be a normal (Gaussian) distribution. The shifted log-normal distribution is then described by three parameters:
+The log-normal distribution is called "log-normal" because the parameters are the mean and standard deviation of the log-transformed response, which is assumed to be a normal (Gaussian) distribution. The shifted log-normal distribution is then described by three parameters:
 
-- $\mu$ (mu, difficulty): the mean of the log-normal distribution. The mean of $\mu$
- represents the median response time. The median response time is given by $\text{shift} + \exp (\mu)$. 
-
+- $\mu$ (mu, difficulty): the mean of the log-normal distribution. The median duration is given by $\text{shift} + \exp (\mu)$.
+ 
 - $\sigma$ (sigma, scale): the standard deviation of the log-normal distribution. Increases the mean but not the median of $\mu$.
 
 - $\text{shift}$ (ndt) indicates the time of the earliest possible response. When $\text{shift} = 0$, the shifted log-normal distribution correspond to the conventional log-normal distribution with two parameters.
@@ -606,7 +659,7 @@ df2 %>%
     coord_cartesian(ylim = c(0, 8) )
 ```
 
-As can be seen in Figure \ref{fig:duration-predictions-plot}, the model predicts larger letter duration for hard letters as compared to easy letters for each grade. As can be seen from Table \ref{tab:duration-summary}, the only BFs favouring the alternative hypothesis (relative to the null hypothesis) are the BFs for the difference between Grade 1 and Grade 3 in average letter duration (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as the difference between Grade 1 and Grade 5 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:duration-predictions-summary}.
+As can be seen in Figure \ref{fig:duration-predictions-plot}, the model predicts larger letter duration for the hard letter f as compared to the easy letter t for each grade. As can be seen from Table \ref{tab:duration-summary}, the only BFs favouring the alternative hypothesis (relative to the null hypothesis) are the BFs for the difference between Grade 1 and Grade 3 in average letter duration (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as the difference between Grade 1 and Grade 5 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_duration %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:duration-predictions-summary}.
 
 ```{r duration-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
 # retrieving the model's predictions
@@ -645,7 +698,7 @@ apa_table(
 
 The output of a Bayesian model is a (joint) posterior distribution over all parameters of the model. We can marginalise this joint distribution to obtain the (marginal) posterior distribution on each parameter. To summarise this distribution, we can retrieve samples from the joint posterior distribution. Interestingly, this means we can look at the posterior distribution of any parameter of interest. For instance, and for exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-```{r posterior-duration, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on letter duration (in seconds) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+```{r posterior-duration, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 10, fig.height = 8, fig.cap = "Effect of word frequency on letter duration (in seconds) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
 ###############################################################
 # Computing the effect of frequency for each letter and Grade #
 ###############################################################
@@ -871,7 +924,7 @@ df2 %>%
     coord_cartesian(ylim = c(0, 9) )
 ```
 
-As can be seen in Figure \ref{fig:stops-predictions-plot}, the model most predicts an interaction between the effect of the word frequency and the effect of first-letter graphomotor difficulty in Grade 1, with infrequent words leading to a greater number of stops than frequent words for hard letters (HL) more than for easy letters (EL)
+As can be seen in Figure \ref{fig:stops-predictions-plot}, the model most predicts an interaction between the effect of the word frequency and the effect of first-letter graphomotor difficulty in Grade 1, with infrequent words leading to a greater number of stops than frequent words for f (hard letter, HL) more than for t (easy letter, EL)
 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "frequency:graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). As can be seen from Table \ref{tab:stops-summary}, others BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as between Grade 1 and Grade 5 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), the effect of word frequency in Grade 1 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "frequency"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and Grade 3 (`r glue_data(model_summary_stops %>% dplyr::filter(Term == "groupGrade3:frequency"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:stops-predictions-summary}.
 
 ```{r stops-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
@@ -911,7 +964,7 @@ apa_table(
 
 For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-```{r posterior-stops, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the number of stops for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+```{r posterior-stops, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 10, fig.height = 8, fig.cap = "Effect of word frequency on the number of stops for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
 ###############################################################
 # Computing the effect of frequency for each letter and Grade #
 ###############################################################
@@ -1137,7 +1190,7 @@ df2 %>%
     coord_cartesian(ylim = c(0, 50) )
 ```
 
-As can be seen in Figure \ref{fig:velocity-predictions-plot}, the model most notably predicts higher velocity for hard letters as compared to easy letters, excepted for low frequency words in Grade 1. First graders seem to have lower velocity than third graders, who themselves seem to have lower velocity than fifth graders on average. As can be seen from Table \ref{tab:velocity-summary}, BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as between Grade 1 and Grade 5 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:velocity-predictions-summary}.
+As can be seen in Figure \ref{fig:velocity-predictions-plot}, the model most notably predicts higher velocity for the hard letter f as compared to the easy letter t, excepted for low frequency words in Grade 1. First graders seem to have lower velocity than third graders, who themselves seem to have lower velocity than fifth graders on average. As can be seen from Table \ref{tab:velocity-summary}, BFs favouring the alternative hypothesis (relative to the null hypothesis) are  BFs for the difference between Grade 1 and Grade 3 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade3"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), as well as between Grade 1 and Grade 5 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "groupGrade5"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`), and the effect of graphomotor difficulty in Grade 1 (`r glue_data(model_summary_velocity %>% dplyr::filter(Term == "graphomotor_difficulty"), "$\\beta$ = {Estimate}, 95% CrI [{Lower}, {Upper}], BF~10~ = {BF10}")`). Predictions from this model for each condition are also summarised in Table \ref{tab:velocity-predictions-summary}.
 
 ```{r velocity-predictions-summary, eval = TRUE, echo = FALSE, results = "asis"}
 # retrieving the model's predictions
@@ -1176,7 +1229,7 @@ apa_table(
 
 For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-```{r posterior-velocity, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the mean velocity (in mm per second) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+```{r posterior-velocity, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 10, fig.height = 8, fig.cap = "Effect of word frequency on the mean velocity (in mm per second) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
 ###############################################################
 # Computing the effect of frequency for each letter and Grade #
 ###############################################################
@@ -1442,7 +1495,7 @@ apa_table(
 
 For exploratory purposes, we depict below the posterior distribution of the difference between high-frequency and low-frequency words (i.e., the effect of frequency) separately for each letter (graphomotor difficulty) and each grade. We averaged the predictions across both conditions of graphemic complexity, as this effect appeared to be null.
 
-```{r posterior-size, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 9, fig.height = 6, fig.cap = "Effect of word frequency on the letter size (in mm) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
+```{r posterior-size, echo = FALSE, eval = TRUE, out.width = "100%", fig.width = 10, fig.height = 8, fig.cap = "Effect of word frequency on the letter size (in mm) for each grade (in column) and letter (in row). The histogram contains posterior samples for each effect, where the posterior distribution is summarised by its mean and 95\\% highest density interval (HDI). The green text indicates the probability that the parameter values is either inferior or superior to 0."}
 ###############################################################
 # Computing the effect of frequency for each letter and Grade #
 ###############################################################
