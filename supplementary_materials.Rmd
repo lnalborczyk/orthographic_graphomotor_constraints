@@ -1601,9 +1601,15 @@ par(mfrow = c(1, 1) )
 
 As can be seen in Figure \ref{fig:posterior-size}, the posterior distribution for the effect of frequency is almost perfectly centred on zero in all conditions, except for letter f in Grade 1. In this condition, there is a `r round(mean((freq_f_grade1_hf - freq_f_grade1_lf) > 0), 3)` probability that the effect of frequency on the letter size (in mm) is positive (given the data and the priors).
 
-# Acknowledgments
+# Acknowledgements
+
+Acknowledgements will be included in the final version of the supplementary materials.
+
+<!--
 
 This work, carried out within the Labex BLRI (ANR-11-LABX-0036) and the Institut Convergence ILCB (ANR-16-CONV-0002), has benefited from support from the French Government, managed by the French National Agency for Research (ANR), under the project title DYSTACMAP (ANR-13-APPR-0010).
+
+-->
 
 \newpage
 
