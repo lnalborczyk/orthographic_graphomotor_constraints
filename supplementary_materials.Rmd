@@ -27,6 +27,7 @@ affiliation:
 bibliography: [bib/constraints.bib, bib/r-references.bib]
 figsintext: true
 class: doc
+mask: yes
 link-citations: true
 fontsize: 11pt
 linestretch: 1.25
