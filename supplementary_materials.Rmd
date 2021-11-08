@@ -344,7 +344,13 @@ This kind of model is now able to predict valid number of stops (i.e., positive 
 
 ## Fitting the final model
 
-To set up the model, we need to invoke the `brms::brmsformula()` function and construct one formula for each of the four dependant variables. We fitted all models using the `brms` package [@R-brms_a] [for an introduction to Bayesian multilevel modelling in brms, see @nalborczyk_introduction_2019]. We used sum contrasts (i.e., recoding conditions as -0.5 vs. 0.5) for binary predictors (i.e., frequency, grapheme complexity, and graphomotor difficulty) and used the default factor coding scheme (i.e., dummy coding) for grade.
+<!--
+
+[for an introduction to Bayesian multilevel modelling in brms, see @nalborczyk_introduction_2019]
+
+-->
+
+To set up the model, we need to invoke the `brms::brmsformula()` function and construct one formula for each of the four dependant variables. We fitted all models using the `brms` package [@R-brms_a]. We used sum contrasts (i.e., recoding conditions as -0.5 vs. 0.5) for binary predictors (i.e., frequency, grapheme complexity, and graphomotor difficulty) and used the default factor coding scheme (i.e., dummy coding) for grade.
 
 ```{r model1-formula, results = "hide"}
 # defining the model formula for the generalised multilevel model
